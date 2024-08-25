@@ -21,6 +21,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/app/libs/prismaDB.jsx", "src/app/api/[...nextauth]/route.jsx", "src/app/layout.tsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/app/libs/prismaDB.jsx", "src/app/api/[...nextauth]/route.jsx", "src/app/layout.tsx", "src/app/(pages)/liked/page.jsx"],
   "exclude": ["node_modules"]
 }

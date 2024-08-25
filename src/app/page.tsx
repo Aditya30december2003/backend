@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { getServerSession } from "next-auth";
 import { authOptions } from "./api/auth/[...nextauth]/route";
+import HomePage from '@/app/(pages)/Home/Home'
 import { redirect } from "next/navigation";
 export default async function Home() {
   const session = await getServerSession(authOptions);
@@ -12,7 +13,7 @@ export default async function Home() {
   return (
     <main className="">
       <div className="">
-       Home Page
+       <HomePage />
       </div>
     </main>
   );
