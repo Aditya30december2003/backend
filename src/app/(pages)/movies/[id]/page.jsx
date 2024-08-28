@@ -140,7 +140,7 @@ const Info = () => {
                     </p>
                 </div>
             </div>
-            <Reviews />
+            <Reviews movieId={movieId}/>
         </div>
     );
 };

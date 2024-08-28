@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -48,6 +45,41 @@ model Rating {
 
   @@unique([userId, movieId]) // Ensures a unique combination of userId and movieId
 }
+
+model Review {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  content   String
+  userId    String    @db.ObjectId
+  movieId   String    @db.ObjectId
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id])
+  movie     Movie     @relation(fields: [movieId], references: [id])
+  likes      Int       @default(0)
+  emojis     Int       @default(0)
+  fire       Int       @default(0)
+  popularity Int       @default(0) 
+  reviewComment reviewComment[] //review comments 
+
+  @@unique([userId, movieId]) // Ensures a unique combination of userId and movieId
+}
+
+model reviewComment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  comment   String
+  userId    String   @db.ObjectId
+  reviewId  String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
+  review    Review   @relation(fields: [reviewId], references: [id])
+
+  @@index([reviewId]) // Adding an index for quicker lookups by reviewId
+}
+
+
 model Movie {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   tmdbId    String   @unique
@@ -55,7 +87,8 @@ model Movie {
   posterUrl String?
   watchlist Watchlist[]
   liked     Liked[]
-  ratings   Rating[] // Relationship to ratings array of ratings given my diffrent users to that particular movie
+  ratings   Rating[]
+  reviews   Review[] // Relationship to reviews
 
   // other fields...
 }
@@ -75,30 +108,30 @@ model User {
   accounts      Account[]
   watchlist     Watchlist[]
   liked         Liked[]
-  ratings       Rating[]    // Relationship to ratings // arrays of all the ratings a user has given across films
+  ratings       Rating[]
+  reviews       Review[]    // Relationship to reviews
+  reviewComment reviewComment[] // relationship to reviewComments
+
 
   // other fields...
 }
 
-
-model Account{
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String   @db.ObjectId
-  type          String
-  provider      String
+model Account {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String   @db.ObjectId
+  type              String
+  provider          String
   providerAccountId String
-  refresh_token      String? @db.String
-  access_token       String? @db.String
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String? @db.String
-  session_state      String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refresh_token     String?  @db.String
+  access_token      String?  @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.String
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
-
 }
-  
