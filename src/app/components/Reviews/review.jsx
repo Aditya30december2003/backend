@@ -39,7 +39,7 @@ const Review = ({ movieId }) => {
   };
 
   const handleReaction = async (reviewId, type) => {
-    window.location.reload()
+    // window.location.reload()
     try {
         const response = await fetch('/api/reaction', {
             method: 'POST',
@@ -68,63 +68,66 @@ const Review = ({ movieId }) => {
     }
 };
 
-  const handleSubmit = async () => {
-    window.location.reload()
-    if (!reviewText.trim()) return;
+const handleSubmit = async () => {
+  if (!reviewText.trim()) return;
 
-    try {
+  try {
       const response = await fetch('/api/review', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ movieId, reviewText }),
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ movieId, reviewText }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to submit review');
+          throw new Error('Failed to submit review');
       }
 
       const newReview = await response.json();
+      console.log("New Review:", newReview); // Log the new review data
       setReviews([...reviews, newReview]);
       setReviewText('');
-      setError(null); // Clear error on successful submission
-    } catch (error) {
-      setError(error.message); // Set error message for user feedback
+      setError(null);
+  } catch (error) {
+      setError(error.message);
       console.error(error);
-    }
-  };
+  }
+};
 
-  const handleCommentSubmit = async (reviewId, commentText) => {
-    if (!commentText.trim()) return;
 
-    try {
+const handleCommentSubmit = async (reviewId, commentText) => {
+  if (!commentText.trim()) return;
+
+  try {
       const response = await fetch('/api/reviewComments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ reviewId, comment: commentText }), // Updated field names
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ reviewId, comment: commentText }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to submit comment');
+          throw new Error('Failed to submit comment');
       }
 
-      // Assuming the API returns the updated review with comments
       const updatedReview = await response.json();
-      setReviews((prevReviews) =>
-        prevReviews.map((review) =>
-          review.id === reviewId ? updatedReview : review
-        )
+      console.log("Updated Review:", updatedReview); // Log the updated review data
+
+      setReviews(prevReviews =>
+          prevReviews.map(review =>
+              review.id === reviewId ? updatedReview : review
+          )
       );
 
-      // Clear the comment input for the specific review
       setCommentText(prev => ({ ...prev, [reviewId]: '' }));
-    } catch (error) {
+  } catch (error) {
       console.error(error);
-    }
-  };
+  }
+};
+
+
 
   if (loading) return <p>Loading...</p>;
 
@@ -212,9 +215,9 @@ const Review = ({ movieId }) => {
               )}
               {/* Display existing comments */}
               {review.comments && review.comments.map(comment => (
-                <div key={comment.id} className="mt-2 ml-6">
-                  <p className="text-sm"><strong>{comment.user.name}:</strong> {comment.comment}</p>
-                </div>
+              <div key={comment.id} className="mt-2 ml-6">
+              <p className="text-sm"><strong>{comment.user.name}:</strong> {comment.comment}</p>
+              </div>
               ))}
             </div>
           </div>      

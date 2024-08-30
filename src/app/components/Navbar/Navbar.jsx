@@ -45,7 +45,7 @@ const Navbar = ({ session }) => {
                     </li>
                     <li className='cursor-pointer'>About</li>
                     <li><Link href='/profile' className='cursor-pointer'>Profile</Link></li>
-                    <li className='cursor-pointer'>Write</li>
+                    <li className='cursor-pointer'><Link href='/write' className='cursor-pointer'>Write</Link></li>
                     <li><Logout /></li>
                 </ul>
             )}

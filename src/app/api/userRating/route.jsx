@@ -17,7 +17,7 @@ async function getUser(session) {
 // Helper function to get or create movie
 async function getOrCreateMovie(tmdbId) {
     let movie = await prisma.movie.findUnique({
-        where: { tmdbId: tmdbId },
+        where: { tmdbId: String(tmdbId) },
     });
     if (!movie) {
         movie = await prisma.movie.create({
