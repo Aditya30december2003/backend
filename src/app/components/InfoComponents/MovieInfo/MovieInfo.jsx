@@ -485,6 +485,7 @@ const MovieInfo = ({
                         title: item.title || item.original_title,
                         poster_path: item.poster_path,
                         posterUrl: item.posterUrl || null,
+                        release_date: item.release_date || item.releaseDate || null,
                       }}
                       className="relative z-[80]"
                       defaultInWatchlist={isInWatchlist}

@@ -39,6 +39,7 @@ const buildTree = (flat = []) => {
 };
 const countTree = (nodes) =>
   nodes.reduce((n, c) => n + 1 + (c.children?.length ? countTree(c.children) : 0), 0);
+const safeImageSrc = (src) => (typeof src === "string" && src.trim() ? src.trim() : null);
 
 /* ---------- UI ---------- */
 export default function PostModal({ post, onClose, onReactionUpdate }) {
@@ -90,7 +91,9 @@ export default function PostModal({ post, onClose, onReactionUpdate }) {
   const username = post.user?.username || post.author || post.user?.email?.split("@")[0] || "user";
   const userId = post.user?.id;
   const createdAt = post.createdAt;
-  const hasImage = !!post.thumbnail;
+  const resolvedThumbnail = safeImageSrc(post.thumbnail);
+  const [imgOk, setImgOk] = useState(Boolean(resolvedThumbnail));
+  const hasImage = Boolean(resolvedThumbnail && imgOk);
   const postBody = htmlToPlainText(post.content || post.excerpt || post.title);
   const isBlogPost = entityType === "blog";
   const postHref =
@@ -101,6 +104,10 @@ export default function PostModal({ post, onClose, onReactionUpdate }) {
       : `/blog/${post.id}`;
   const shouldShowReadMore = isBlogPost && postBody.length > 260;
   const emojis = ["😂", "😍", "😮", "😢", "😡", "👍", "🔥", "✨", "🎯", "💯"];
+
+  useEffect(() => {
+    setImgOk(Boolean(resolvedThumbnail));
+  }, [resolvedThumbnail]);
 
   /* ---------- fetch comments as TREE ---------- */
   const fetchComments = useCallback(async () => {
@@ -289,11 +296,12 @@ async function react(kind) {
   {hasImage ? (
     <div className="relative h-full w-full">
       <Image
-        src={post.thumbnail}
+        src={resolvedThumbnail}
         alt={post.title}
         fill
         className="object-contain"
         sizes="(max-width: 768px) 100vw, 50vw"
+        onError={() => setImgOk(false)}
       />
     </div>
   ) : (

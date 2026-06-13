@@ -140,6 +140,7 @@ model Movie {
   tmdbId    String      @unique
   title     String
   posterUrl String?
+  releaseDate String?
   watchlist LegacyWatchlist[]
   watchlistItems WatchlistItem[]
   liked     Liked[]
@@ -166,7 +167,7 @@ model User {
   image           String?
   avatarUrl       String?
   emailVerified   DateTime?
-  movieGenres     String[]
+  movieGenres     String[]         @default([])
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   accounts        Account[]
@@ -203,6 +204,7 @@ model Watchlist {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   ownerId    String   @map("userId") @db.ObjectId
   name       String
+  description String?
   slug       String
   visibility WatchlistVisibility?
   isPublic   Boolean  @default(false) // legacy mirror field for backward compatibility

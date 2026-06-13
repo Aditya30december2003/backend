@@ -1,6 +1,7 @@
 // lib/auth-options.ts
 import prisma from "@/app/libs/prismaDB";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import type { Adapter } from "next-auth/adapters";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import type { NextAuthOptions } from "next-auth";
@@ -98,8 +99,32 @@ function sanitizeJwtToken(token: JWT): JWT {
   return nextToken;
 }
 
+const baseAdapter = PrismaAdapter(prisma);
+const adapter: Adapter = {
+  ...baseAdapter,
+  async createUser(data) {
+    const normalizedEmail =
+      typeof data.email === "string" ? normalizeEmail(data.email) : "";
+    const safeImage = toSessionUrl(data.image);
+    const fallbackName =
+      toClampedNullableString(data.name, SESSION_NAME_MAX_LENGTH) ??
+      (normalizedEmail ? normalizedEmail.split("@")[0] : null) ??
+      "Movie fan";
+
+    return prisma.user.create({
+      data: {
+        ...data,
+        email: normalizedEmail || data.email,
+        name: fallbackName,
+        image: safeImage,
+        avatarUrl: safeImage,
+      },
+    });
+  },
+};
+
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,

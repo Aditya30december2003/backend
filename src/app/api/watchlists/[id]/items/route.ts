@@ -52,6 +52,10 @@ export async function POST(
     const movieId = typeof body?.movieId === "string" ? body.movieId.trim() : String(body?.movieId || "").trim();
     const title = typeof body?.title === "string" ? body.title : null;
     const posterUrl = typeof body?.posterUrl === "string" ? body.posterUrl : null;
+    const releaseDate =
+      typeof body?.releaseDate === "string" && body.releaseDate.trim()
+        ? body.releaseDate.trim()
+        : null;
     const notes = typeof body?.notes === "string" ? body.notes : null;
 
     if (!movieId) return err("VALIDATION_ERROR", "movieId is required", 400);
@@ -62,6 +66,7 @@ export async function POST(
       movieId,
       title,
       posterUrl,
+      releaseDate,
       notes,
     });
 

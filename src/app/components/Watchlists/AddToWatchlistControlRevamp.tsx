@@ -18,6 +18,8 @@ type MovieInput = {
   original_title?: string;
   poster_path?: string | null;
   posterUrl?: string | null;
+  release_date?: string | null;
+  releaseDate?: string | null;
 };
 
 type WatchlistSummary = {
@@ -63,6 +65,10 @@ function getMoviePoster(movie: MovieInput) {
   if (movie?.poster_path) return `https://image.tmdb.org/t/p/original${movie.poster_path}`;
   if (movie?.posterUrl) return movie.posterUrl;
   return null;
+}
+
+function getMovieReleaseDate(movie: MovieInput) {
+  return movie?.release_date || movie?.releaseDate || null;
 }
 
 function canEditList(list: WatchlistSummary) {
@@ -294,12 +300,13 @@ export default function AddToWatchlistControlRevamp({
         const res = await fetch(`/api/watchlists/${watchlistId}/items`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            movieId: tmdbId,
-            title: getMovieTitle(movie),
-            posterUrl: getMoviePoster(movie),
-          }),
-        });
+            body: JSON.stringify({
+              movieId: tmdbId,
+              title: getMovieTitle(movie),
+              posterUrl: getMoviePoster(movie),
+              releaseDate: getMovieReleaseDate(movie),
+            }),
+          });
         const payload = await res.json().catch(() => null);
         if (!res.ok || !payload?.ok) {
           throw new Error(payload?.error?.message || "Failed to save movie");
@@ -338,9 +345,9 @@ export default function AddToWatchlistControlRevamp({
       defaultId = loaded?.defaultWatchlistId || null;
     }
     if (!defaultId) {
-      showToast("Could not find watchlist", 1500);
-      return;
-    }
+        showToast("Could not find your default list", 1500);
+        return;
+      }
 
     const inDefault = data.movieMembership
       ? Boolean(data.movieMembership.inDefault)
@@ -351,44 +358,45 @@ export default function AddToWatchlistControlRevamp({
   const createListAndSave = async () => {
     const name = newListName.trim();
     if (!name) {
-      showToast("Collection name is required", 1400);
+      showToast("List name is required", 1400);
       return;
     }
 
     setCreating(true);
     try {
-      const createRes = await fetch("/api/watchlists", {
+      const createRes = await fetch("/api/lists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, visibility: "PRIVATE" }),
+        body: JSON.stringify({ title: name, isPublic: false }),
       });
       const createPayload = await createRes.json().catch(() => null);
-      if (!createRes.ok || !createPayload?.ok) {
-        throw new Error(createPayload?.error?.message || "Failed to create collection");
+      if (!createRes.ok || !createPayload?.list) {
+        throw new Error(createPayload?.error || "Failed to create list");
       }
 
-      const created = createPayload.data.watchlist as WatchlistSummary;
+      const created = createPayload.list as { id: string; title?: string; name?: string };
       setNewListName("");
 
-      const saveRes = await fetch(`/api/watchlists/${created.id}/items`, {
+      const saveRes = await fetch(`/api/lists/${created.id}/movies`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           movieId: tmdbId,
           title: getMovieTitle(movie),
-          posterUrl: getMoviePoster(movie),
+          posterPath: getMoviePoster(movie),
+          releaseDate: getMovieReleaseDate(movie),
         }),
       });
       const savePayload = await saveRes.json().catch(() => null);
-      if (!saveRes.ok || !savePayload?.ok) {
-        throw new Error(savePayload?.error?.message || "Failed to save movie to collection");
+      if (!saveRes.ok) {
+        throw new Error(savePayload?.error || "Failed to save movie to list");
       }
 
       invalidateWatchlistsCache();
       await loadLists({ force: true, withMovieMembership: true });
-      showToast(`Saved to ${created.name}`);
+      showToast(`Saved to ${created.title || created.name || "your list"}`);
     } catch (error: any) {
-      showToast(error?.message || "Failed to create collection", 1600);
+      showToast(error?.message || "Failed to create list", 1600);
     } finally {
       setCreating(false);
     }
@@ -515,21 +523,21 @@ export default function AddToWatchlistControlRevamp({
         }
         aria-label={
           compact
-            ? inDefault
-              ? "Manage watchlists and collections"
-              : "Save to watchlist and choose collection"
-            : inDefault
-              ? "Manage watchlists and collections"
-              : "Save to watchlist and choose collection"
+              ? inDefault
+                ? "Manage your saved lists"
+                : "Save to watchlist and choose lists"
+             : inDefault
+              ? "Manage your saved lists"
+              : "Save to watchlist and choose lists"
         }
         title={
           compact
-            ? inDefault
-              ? "Manage watchlists and collections"
-              : "Save to watchlist and choose collection"
+             ? inDefault
+              ? "Manage your saved lists"
+              : "Save to watchlist and choose lists"
             : inDefault
-              ? "Manage watchlists and collections"
-              : "Save to watchlist and choose collection"
+              ? "Manage your saved lists"
+              : "Save to watchlist and choose lists"
         }
       >
         {inDefault ? <MdCheck size={compact ? 16 : 18} /> : compact ? <MdAdd size={16} /> : <MdBookmark size={18} />}
@@ -551,7 +559,7 @@ export default function AddToWatchlistControlRevamp({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-semibold tracking-tight text-white">Save to watchlist</p>
+            <p className="text-sm font-semibold tracking-tight text-white">Save to lists</p>
             {loading ? (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
             ) : null}
@@ -571,27 +579,27 @@ export default function AddToWatchlistControlRevamp({
 
             <div>
               <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">
-                Collections
-              </p>
-              <div className="space-y-1.5">
-                {collectionLists.map((list) => renderListRow(list))}
-                {!loading && collectionLists.length === 0 ? (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white/65">
-                    No collections yet.
-                  </div>
-                ) : null}
+                  Lists
+                </p>
+                <div className="space-y-1.5">
+                  {collectionLists.map((list) => renderListRow(list))}
+                  {!loading && collectionLists.length === 0 ? (
+                    <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white/65">
+                      No custom lists yet.
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            </div>
 
             {!loading && !defaultList && visibleWatchlists.length === 0 ? (
               <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white/70">
-                No watchlist found yet.
-              </div>
-            ) : null}
+                  No lists found yet.
+                </div>
+              ) : null}
           </div>
 
           <div className="mt-3 border-t border-white/10 pt-3">
-            <p className="mb-2 text-xs uppercase tracking-wide text-white/45">New collection</p>
+            <p className="mb-2 text-xs uppercase tracking-wide text-white/45">New list</p>
             <div className={compact ? "grid grid-cols-1 gap-2" : "flex items-center gap-2"}>
               <input
                 value={newListName}

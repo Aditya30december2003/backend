@@ -108,10 +108,12 @@ export async function resolveMovieForWatchlist({
   movieId,
   title,
   posterUrl,
+  releaseDate,
 }: {
   movieId: string;
   title?: string | null;
   posterUrl?: string | null;
+  releaseDate?: string | null;
 }) {
   const tmdbId = String(movieId || "").trim();
   if (!tmdbId) throw new Error("movieId is required");
@@ -121,11 +123,13 @@ export async function resolveMovieForWatchlist({
     update: {
       title: title || undefined,
       posterUrl: posterUrl ?? undefined,
+      releaseDate: releaseDate ?? undefined,
     },
     create: {
       tmdbId,
       title: title || "Untitled movie",
       posterUrl: posterUrl ?? null,
+      releaseDate: releaseDate ?? null,
     },
   });
 }
@@ -409,10 +413,12 @@ export function parseWatchlistSummary(input: any, currentUserId?: string) {
   return {
     id: input.id,
     name: input.name,
+    description: input.description ?? null,
     slug: input.slug,
     coverImage: input.coverImage ?? null,
     previewPosterUrl,
     visibility,
+    isPublic: visibility === "SHARED",
     isSystemDefault: Boolean(input.isSystemDefault) || input.slug === DEFAULT_WATCHLIST_SLUG || input.slug === LEGACY_DEFAULT_WATCHLIST_SLUG,
     ownerId: input.ownerId,
     shareToken: input.shareToken ?? null,
@@ -445,6 +451,7 @@ export async function addMovieToWatchlist({
   movieId,
   title,
   posterUrl,
+  releaseDate,
   notes,
 }: {
   watchlistId: string;
@@ -452,9 +459,10 @@ export async function addMovieToWatchlist({
   movieId: string;
   title?: string | null;
   posterUrl?: string | null;
+  releaseDate?: string | null;
   notes?: string | null;
 }) {
-  const movie = await resolveMovieForWatchlist({ movieId, title, posterUrl });
+  const movie = await resolveMovieForWatchlist({ movieId, title, posterUrl, releaseDate });
 
   const nextRank = await getNextRank(watchlistId);
 

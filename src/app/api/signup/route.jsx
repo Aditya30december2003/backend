@@ -143,6 +143,7 @@ export async function POST(request) {
       );
     }
 
+    console.error("POST /api/signup error", error);
     return NextResponse.json({ error: "Unable to create account." }, { status: 500 });
   }
 }

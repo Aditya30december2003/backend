@@ -46,9 +46,9 @@ function getHeaderValue(headers: unknown, name: string): string | undefined {
   if (!headers) return undefined;
 
   const lower = name.toLowerCase();
-  const maybeGet = (headers as { get?: (key: string) => string | null }).get;
-  if (typeof maybeGet === "function") {
-    return maybeGet(lower) ?? maybeGet(name) ?? undefined;
+  const headersWithGet = headers as { get?: (key: string) => string | null };
+  if (typeof headersWithGet.get === "function") {
+    return headersWithGet.get(lower) ?? headersWithGet.get(name) ?? undefined;
   }
 
   const record = headers as Record<string, string | string[] | undefined>;

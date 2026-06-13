@@ -124,6 +124,10 @@ export default function WatchListClientRevamp({ initialWatchlistId = null }) {
       const payload = await loadBaseWatchlists(force);
       setLists((payload?.watchlists || []).filter((l) => !isLegacyHidden(l)).map(normalize));
     } catch (e) {
+      if (detailMode && e?.status === 401) {
+        setLists([]);
+        return;
+      }
       toast.error(e.message || "Failed to load watchlists.");
     } finally {
       setLoadingLists(false);
@@ -288,16 +292,17 @@ export default function WatchListClientRevamp({ initialWatchlistId = null }) {
           <section className="rounded-3xl border border-white/15 bg-black/25 p-4 md:p-6 backdrop-blur-xl shadow-2xl">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
               <div className="min-w-0">
-                <button type="button" onClick={() => router.push("/watchlists")} className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10">
-                  <MdArrowBack /> Back to watchlist
+                <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push("/"))} className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10">
+                  <MdArrowBack /> Back
                 </button>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl md:text-3xl font-bold truncate">{active?.name || "Collection"}</h1>
-                  {active ? <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs">{isShared(active) ? <MdPublic /> : <MdLock />}{isShared(active) ? "Shared" : "Private"}</span> : null}
-                  {active && isDefault(active) ? <span className="rounded-full border border-yellow-300/30 bg-yellow-500/10 px-2.5 py-1 text-xs text-yellow-200">All Watchlisted</span> : null}
-                </div>
-                <p className="mt-2 text-sm text-white/70">{active?.items?.length ?? active?.count ?? 0} movies</p>
-                {isShared(active) && active?.members?.length ? (
+                 <div className="flex flex-wrap items-center gap-2">
+                   <h1 className="text-2xl md:text-3xl font-bold truncate">{active?.name || "Collection"}</h1>
+                   {active ? <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs">{isShared(active) ? <MdPublic /> : <MdLock />}{active?.isPublic ? "Public" : isShared(active) ? "Shared" : "Private"}</span> : null}
+                   {active && isDefault(active) ? <span className="rounded-full border border-yellow-300/30 bg-yellow-500/10 px-2.5 py-1 text-xs text-yellow-200">All Watchlisted</span> : null}
+                 </div>
+                 <p className="mt-2 text-sm text-white/70">{active?.items?.length ?? active?.count ?? 0} movies</p>
+                 {active?.description ? <p className="mt-2 max-w-2xl text-sm text-white/75">{active.description}</p> : null}
+                 {isShared(active) && active?.members?.length ? (
                   <div className="mt-3 flex items-center gap-2">
                     <div className="flex -space-x-2">
                       {active.members.slice(0, 6).map((m) => <Avatar key={m.id} user={m.user} size={28} ring="border-2 border-[#1b160d]" />)}

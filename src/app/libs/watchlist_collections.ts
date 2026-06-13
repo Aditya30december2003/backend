@@ -21,10 +21,12 @@ export async function resolveMovie({
   movieId,
   title,
   posterUrl,
+  releaseDate,
 }: {
   movieId: string;
   title?: string | null;
   posterUrl?: string | null;
+  releaseDate?: string | null;
 }) {
-  return resolveMovieForWatchlist({ movieId, title, posterUrl });
+  return resolveMovieForWatchlist({ movieId, title, posterUrl, releaseDate });
 }

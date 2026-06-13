@@ -21,6 +21,17 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const maxDuration = 30;
 
+function isDefaultWatchlistRecord(input: {
+  slug?: string | null;
+  isSystemDefault?: boolean | null;
+}) {
+  return (
+    Boolean(input?.isSystemDefault) ||
+    input?.slug === DEFAULT_WATCHLIST_SLUG ||
+    input?.slug === LEGACY_DEFAULT_WATCHLIST_SLUG
+  );
+}
+
 function mapMember(member: any) {
   return {
     id: member.id,
@@ -101,10 +112,40 @@ export async function GET(
 ) {
   try {
     const me = await getCurrentUserOrNull();
-    if (!me) return err("UNAUTHORIZED", "Unauthorized", 401);
+    let access = me ? await getAccessibleWatchlistForUser(params.id, me.id) : null;
 
-    const access = await getAccessibleWatchlistForUser(params.id, me.id);
-    if (!access) return err("NOT_FOUND", "Watchlist not found", 404);
+    if (!access) {
+      const publicWatchlist = await prisma.watchlist.findUnique({
+        where: { id: params.id },
+        select: {
+          id: true,
+          ownerId: true,
+          isPublic: true,
+          isSystemDefault: true,
+          slug: true,
+        },
+      });
+
+      if (
+        !publicWatchlist ||
+        !publicWatchlist.isPublic ||
+        isDefaultWatchlistRecord(publicWatchlist)
+      ) {
+        return err("NOT_FOUND", "Watchlist not found", 404);
+      }
+
+      access = {
+        watchlist: publicWatchlist,
+        role: "VIEWER",
+        membership: null,
+        isOwner: false,
+      } as any;
+    }
+
+    const resolvedAccess = access;
+    if (!resolvedAccess) {
+      return err("NOT_FOUND", "Watchlist not found", 404);
+    }
 
     const full = await prisma.watchlist.findUnique({
       where: { id: params.id },
@@ -124,6 +165,7 @@ export async function GET(
                 tmdbId: true,
                 title: true,
                 posterUrl: true,
+                releaseDate: true,
               },
             },
             addedByUser: {
@@ -140,7 +182,7 @@ export async function GET(
             },
           },
         },
-        invites: roleCanManage(access.role)
+        invites: roleCanManage(resolvedAccess.role)
           ? {
               where: { status: "INVITED" as any },
               orderBy: [{ createdAt: "desc" }],
@@ -159,7 +201,7 @@ export async function GET(
 
     if (!full) return err("NOT_FOUND", "Watchlist not found", 404);
 
-    const summary = parseWatchlistSummary(full, me.id);
+    const summary = parseWatchlistSummary(full, me?.id);
     const sortedItems = sortWatchlistItemsByRank(full.items);
 
     return ok({
@@ -167,8 +209,8 @@ export async function GET(
         ...summary,
         visibility: full.visibility || (full.isPublic ? "SHARED" : "PRIVATE"),
         owner: full.owner,
-        canEdit: access.role === "OWNER" || access.role === "EDITOR",
-        canManage: roleCanManage(access.role),
+        canEdit: resolvedAccess.role === "OWNER" || resolvedAccess.role === "EDITOR",
+        canManage: roleCanManage(resolvedAccess.role),
         items: sortedItems.map(mapItem),
         members: full.members.map(mapMember),
         pendingInvites: Array.isArray(full.invites) ? full.invites.map(mapInvite) : [],
@@ -192,11 +234,7 @@ export async function DELETE(
     if (!access) return err("NOT_FOUND", "Watchlist not found", 404);
     if (!roleCanManage(access.role)) return err("FORBIDDEN", "Owner access required", 403);
 
-    if (
-      access.watchlist.isSystemDefault ||
-      access.watchlist.slug === DEFAULT_WATCHLIST_SLUG ||
-      access.watchlist.slug === LEGACY_DEFAULT_WATCHLIST_SLUG
-    ) {
+    if (isDefaultWatchlistRecord(access.watchlist)) {
       return err("FORBIDDEN", "Default watchlist cannot be deleted", 403);
     }
 
@@ -232,7 +270,7 @@ export async function PATCH(
       if (!name || name.length < 2) {
         return err("VALIDATION_ERROR", "Watchlist name must be at least 2 characters.", 400);
       }
-      if (access.watchlist.isSystemDefault || access.watchlist.slug === "all-watchlisted" || access.watchlist.slug === "my-watchlist") {
+      if (isDefaultWatchlistRecord(access.watchlist)) {
         return err("FORBIDDEN", "Default watchlist name cannot be changed.", 403);
       }
       patch.name = name;
