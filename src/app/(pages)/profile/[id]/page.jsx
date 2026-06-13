@@ -2,12 +2,13 @@
 import { useEffect, useReducer, useMemo, lazy, Suspense, memo, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MdLocalMovies, MdArticle, MdClose, MdEdit } from "react-icons/md";
+import { MdLocalMovies, MdArticle, MdClose, MdEdit, MdViewList } from "react-icons/md";
 import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
 
 // Lazy load heavy components
 const UserBlogs = lazy(() => import('@/app/components/UserBlogs/UserBlogs'));
+const UserLists = lazy(() => import('@/app/components/UserLists/UserLists'));
 const UserReviews = lazy(() => import('@/app/components/UserReviews/UserReviews'));
 const EditProfile = lazy(() => import('@/app/components/EditProfile/EditProfile'));
 
@@ -59,6 +60,19 @@ const profileReducer = (state, action) => {
           stats: {
             ...state.profileData.stats,
             followerCounts: state.profileData.stats.followerCounts + (action.payload.isFollowing ? 1 : -1)
+          }
+        }
+      };
+
+    case 'SET_LIST_COUNT':
+      if (!state.profileData) return state;
+      return {
+        ...state,
+        profileData: {
+          ...state.profileData,
+          stats: {
+            ...state.profileData.stats,
+            listCount: action.payload,
           }
         }
       };
@@ -204,6 +218,17 @@ const TabNavigation = memo(({ activeTab, onTabChange }) => (
       <MdArticle size={20} />
       <span className="font-medium">Stories</span>
     </button>
+    <button
+      onClick={() => onTabChange('lists')}
+      className={`flex items-center gap-2 px-6 py-3 rounded-full transition-all border ${
+        activeTab === 'lists'
+          ? 'bg-white text-black border-white shadow-lg font-medium'
+          : 'bg-transparent text-white border-white/30 hover:border-white/60 hover:bg-white/10'
+      }`}
+    >
+      <MdViewList size={20} />
+      <span className="font-medium">Lists</span>
+    </button>
   </div>
 ));
 
@@ -233,7 +258,7 @@ const LoadingSkeleton = () => (
           
           {/* Stats */}
           <div className="space-y-3 mb-6">
-            {[...Array(2)].map((_, i) => (
+            {[...Array(3)].map((_, i) => (
               <div key={i} className="h-12 bg-gray-700/50 rounded-lg"></div>
             ))}
           </div>
@@ -258,7 +283,7 @@ const LoadingSkeleton = () => (
       <div className="lg:col-span-3">
         {/* Tab Navigation Skeleton */}
         <div className="flex gap-4 mb-8">
-          {[...Array(2)].map((_, i) => (
+          {[...Array(3)].map((_, i) => (
             <div key={i} className="h-12 w-32 bg-gray-700/50 rounded-full"></div>
           ))}
         </div>
@@ -392,6 +417,10 @@ export default function UserProfilePage({ params }) {
     dispatch({ type: 'TOGGLE_FOLLOWING_MODAL', payload: true });
   };
 
+  const handleListCountChange = useCallback((count) => {
+    dispatch({ type: 'SET_LIST_COUNT', payload: count });
+  }, []);
+
   // Main effect for loading data
   useEffect(() => {
     if (id && status !== 'loading') {
@@ -502,6 +531,10 @@ export default function UserProfilePage({ params }) {
                   <span className="text-gray-200">Reviews</span>
                   <span className="text-white font-bold">{memoizedStats.reviewCount || 0}</span>
                 </div>
+                <div className="flex justify-between items-center p-3 bg-white/10 rounded-lg border border-white/20">
+                  <span className="text-gray-200">Lists</span>
+                  <span className="text-white font-bold">{memoizedStats.listCount || 0}</span>
+                </div>
               </div>
 
               {/* Follow Section */}
@@ -531,10 +564,13 @@ export default function UserProfilePage({ params }) {
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
                 </div>
               }>
-                {state.activeTab === 'blogs' ? 
-                  <UserBlogs id={id} /> : 
+                {state.activeTab === 'blogs' ? (
+                  <UserBlogs id={id} />
+                ) : state.activeTab === 'lists' ? (
+                  <UserLists id={id} onCountChange={handleListCountChange} />
+                ) : (
                   <UserReviews id={id} />
-                }
+                )}
               </Suspense>
             </div>
           </div>

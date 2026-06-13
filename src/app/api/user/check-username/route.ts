@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/libs/prismaDB";
 import { getClientIp, normalizeUsername, rateLimit } from "@/app/libs/auth_security";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
   try {
     const ip = getClientIp(req);
@@ -27,13 +30,14 @@ export async function GET(req: NextRequest) {
     const username = normalizeUsername(u);
     if (!username) return NextResponse.json({ available: false });
 
-    const existing = await prisma.user.findUnique({
+    const existing = await prisma.user.findFirst({
       where: { username },
       select: { id: true },
     });
 
     return NextResponse.json({ available: !existing });
-  } catch {
+  } catch (error) {
+    console.error("GET /api/user/check-username error", error);
     return NextResponse.json({ available: false }, { status: 500 });
   }
 }

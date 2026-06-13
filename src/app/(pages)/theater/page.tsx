@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function fetchVideos(q?: string) {
   const url = q ? `/api/videos?q=${encodeURIComponent(q)}` : "/api/videos";
   

@@ -58,7 +58,7 @@ function normalizeForModal(item) {
 }
 
 function safeImageSrc(src) {
-  return typeof src === "string" && src.trim() ? src : "/img/logo.png";
+  return typeof src === "string" && src.trim() ? src.trim() : null;
 }
 
 function releaseYear(dateValue) {
@@ -85,9 +85,11 @@ export default function PostCard({ item, onOpenPost }) {
   const thumbnail = isReview
     ? item?.movie?.posterUrl || item?.thumbnail || ""
     : item?.thumbnail || "";
-  const safeThumb = safeImageSrc(thumbnail);
+  const resolvedThumb = safeImageSrc(thumbnail);
+  const safeThumb = resolvedThumb || "/img/logo.png";
   const createdAtIso = item?.createdAt || item?.created_at;
   const href = isReview ? `/movies/${item?.movie?.tmdbId}` : `/blog/${item?.id}`;
+  const [imgOk, setImgOk] = useState(Boolean(resolvedThumb));
 
   const upsert = useEntityStore((s) => s.upsert);
 
@@ -149,6 +151,10 @@ export default function PostCard({ item, onOpenPost }) {
     };
   }, [session?.user, entityType, itemId, itemHasReactionFlags, snap?.likedByMe, snap?.firedByMe, upsert]);
 
+  useEffect(() => {
+    setImgOk(Boolean(resolvedThumb));
+  }, [resolvedThumb]);
+
   async function react(type) {
     if (busy || !session?.user || !itemId) return;
     setBusy(true);
@@ -205,7 +211,7 @@ export default function PostCard({ item, onOpenPost }) {
   if (!itemId) return null;
 
   if (!isReview) {
-    const blogHasImage = typeof thumbnail === "string" && thumbnail.trim().length > 0;
+    const blogHasImage = Boolean(resolvedThumb && imgOk);
     const articlePreview = htmlToPlainText(item?.excerpt || item?.content || "No article text available.");
 
     return (
@@ -243,6 +249,7 @@ export default function PostCard({ item, onOpenPost }) {
                     fill
                     className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     sizes="(max-width: 640px) 92px, 104px"
+                    onError={() => setImgOk(false)}
                   />
                 </div>
               </Link>
@@ -295,7 +302,7 @@ export default function PostCard({ item, onOpenPost }) {
       : null;
   const movieReleaseYear = releaseYear(item?.movie?.releaseDate || item?.movie?.release_date);
   const reviewText = htmlToPlainText(item?.excerpt || item?.content || "No review text.");
-  const hasPoster = typeof thumbnail === "string" && thumbnail.trim().length > 0;
+  const hasPoster = Boolean(resolvedThumb && imgOk);
 
   return (
     <article className="group w-full overflow-hidden rounded-[24px] bg-black/10 shadow-[0_12px_28px_rgba(0,0,0,0.14)] backdrop-blur-[2px]">
@@ -328,6 +335,7 @@ export default function PostCard({ item, onOpenPost }) {
                   src={safeThumb}
                   alt={`${title} poster`}
                   className="h-[126px] w-[84px] object-cover transition-transform duration-300 group-hover:scale-[1.03] sm:h-[144px] sm:w-[96px]"
+                  onError={() => setImgOk(false)}
                 />
               </div>
             </Link>

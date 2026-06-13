@@ -1,6 +1,12 @@
 // app/api/profile/[slug]/route.jsx
 import prisma from "@/app/api/auth/[...nextauth]/connect";
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import {
+  DEFAULT_WATCHLIST_SLUG,
+  LEGACY_DEFAULT_WATCHLIST_SLUG,
+} from "@/app/libs/watchlists";
 
 export const maxDuration = 30;
 
@@ -11,6 +17,9 @@ export const GET = async (req, { params }) => {
     if (!slug || slug === "undefined") {
       return NextResponse.json({ error: "Invalid profile ID" }, { status: 400 });
     }
+
+    const session = await getServerSession(authOptions);
+    const isOwnProfile = session?.user?.id === slug;
 
     const previewLimitRaw = Number(new URL(req.url).searchParams.get("previewLimit") ?? 5);
     const previewLimit = Number.isFinite(previewLimitRaw)
@@ -37,6 +46,7 @@ export const GET = async (req, { params }) => {
     const [
       reviewCount,
       blogCount,
+      listCount,
       followerCounts,
       followingCounts,
       followersPreview,
@@ -44,6 +54,14 @@ export const GET = async (req, { params }) => {
     ] = await Promise.all([
       prisma.review.count({ where: { userId: slug } }),
       prisma.blog.count({ where: { user: { is: { id: slug } } } }),
+      prisma.watchlist.count({
+        where: {
+          ownerId: slug,
+          isSystemDefault: { not: true },
+          slug: { notIn: [DEFAULT_WATCHLIST_SLUG, LEGACY_DEFAULT_WATCHLIST_SLUG] },
+          ...(isOwnProfile ? {} : { isPublic: true }),
+        },
+      }),
       prisma.follow.count({ where: { followingId: slug } }),
       prisma.follow.count({ where: { followerId: slug } }),
       prisma.follow.findMany({
@@ -92,6 +110,7 @@ export const GET = async (req, { params }) => {
         stats: {
           reviewCount,
           blogCount,
+          listCount,
           followerCounts,
           followingCounts,
         },

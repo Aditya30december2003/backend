@@ -59,6 +59,7 @@ export default function SignupPage() {
 
   const [checking, setChecking] = useState(false);
   const [available, setAvailable] = useState(null);
+  const [usernameCheckError, setUsernameCheckError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const debounceRef = useRef(null);
 
@@ -79,6 +80,7 @@ export default function SignupPage() {
 
   useEffect(() => {
     setAvailable(null);
+    setUsernameCheckError(false);
     if (!username || !USERNAME_RE.test(username)) {
       setChecking(false);
       clearTimeout(debounceRef.current);
@@ -94,6 +96,7 @@ export default function SignupPage() {
         );
 
         if (!res.ok) {
+          setUsernameCheckError(true);
           setAvailable(null);
           return;
         }
@@ -101,6 +104,7 @@ export default function SignupPage() {
         const data = await res.json();
         setAvailable(Boolean(data?.available));
       } catch {
+        setUsernameCheckError(true);
         setAvailable(null);
       } finally {
         setChecking(false);
@@ -112,13 +116,29 @@ export default function SignupPage() {
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const usernameValid = USERNAME_RE.test(username);
+  const usernameReadyForSubmit =
+    usernameValid &&
+    !checking &&
+    (available === true || usernameCheckError);
   const canSubmit =
     emailValid &&
     name.length > 0 &&
-    usernameValid &&
-    available === true &&
+    usernameReadyForSubmit &&
     pw.valid &&
     !submitting;
+
+  const submitDisabledReason = useMemo(() => {
+    if (submitting) return "Creating your account...";
+    if (!email) return "Enter your email to continue.";
+    if (!emailValid) return "Enter a valid email address.";
+    if (!name.length) return "Enter your full name.";
+    if (!username.length) return "Choose a username.";
+    if (!usernameValid) return "Username must be 3-20 chars using a-z, 0-9, _ or .";
+    if (checking) return "Checking username availability...";
+    if (available === false) return "That username is already taken.";
+    if (!pw.valid) return "Password must be 8+ chars with upper, lower, number, and symbol.";
+    return null;
+  }, [available, checking, email, emailValid, name.length, pw.valid, submitting, username.length, usernameValid]);
 
   const userSignUp = async (e) => {
     e.preventDefault();
@@ -272,12 +292,19 @@ export default function SignupPage() {
                       <span className="text-emerald-300">Available</span>
                     ) : available === false ? (
                       <span className="text-red-300">Taken</span>
+                    ) : usernameCheckError ? (
+                      <span className="text-amber-200">Check on submit</span>
                     ) : (
                       <span className="text-white/60">-</span>
                     )}
                   </div>
                 )}
               </div>
+              {username && usernameCheckError && (
+                <p className="mt-1 text-xs text-amber-200">
+                  Couldn&apos;t verify username availability right now. You can still create the account and we&apos;ll validate it on submit.
+                </p>
+              )}
             </div>
 
             <div>
@@ -319,6 +346,11 @@ export default function SignupPage() {
             >
               {submitting ? "Creating..." : "Create account"}
             </button>
+            {!canSubmit && submitDisabledReason ? (
+              <p className="text-center text-xs text-white/70">
+                {submitDisabledReason}
+              </p>
+            ) : null}
           </form>
 
           <div className="my-4 text-center text-xs text-white/50">OR</div>
