@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp, rateLimit } from "@/app/libs/auth_security";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
+const EXTERNAL_FETCH_TIMEOUT_MS = 5000;
+const MOVIE_CARDS_RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const MOVIE_CARDS_RATE_LIMIT_MAX = 30;
 
 type Provider = {
   provider_id: number;
@@ -45,6 +49,12 @@ type MovieCardEnrichment = {
   imdbRating: number | null;
   rottenTomatoes: string | null;
   inTheaters: boolean;
+};
+
+type TimedFetchInit = RequestInit & {
+  next?: {
+    revalidate?: number;
+  };
 };
 
 function tmdbApiKey() {
@@ -92,6 +102,36 @@ function pickProviders(results?: Record<string, WatchProviderResult>) {
   return preferred?.flatrate || preferred?.rent || preferred?.buy || [];
 }
 
+function isAbortLikeError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.name === "AbortError" || error.name === "TimeoutError")
+  );
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: TimedFetchInit,
+  timeoutErrorMessage: string
+) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_FETCH_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (isAbortLikeError(error)) {
+      throw new Error(timeoutErrorMessage);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function fetchTmdbMovieCard(movieId: string) {
   const apiKey = tmdbApiKey();
   if (!apiKey) {
@@ -104,9 +144,13 @@ async function fetchTmdbMovieCard(movieId: string) {
     append_to_response: "release_dates,watch/providers",
   });
 
-  const res = await fetch(`${TMDB_BASE}/movie/${movieId}?${query.toString()}`, {
-    next: { revalidate: 900 },
-  });
+  const res = await fetchWithTimeout(
+    `${TMDB_BASE}/movie/${movieId}?${query.toString()}`,
+    {
+      next: { revalidate: 900 },
+    },
+    `TMDB request timed out for ${movieId}`
+  );
 
   if (!res.ok) {
     throw new Error(`TMDB card request failed for ${movieId}: ${res.status}`);
@@ -125,9 +169,13 @@ async function fetchOmdbRatings(imdbId?: string | null) {
   }
 
   try {
-    const res = await fetch(`https://www.omdbapi.com/?apikey=${key}&i=${imdbId}`, {
-      next: { revalidate: 900 },
-    });
+    const res = await fetchWithTimeout(
+      `https://www.omdbapi.com/?apikey=${key}&i=${imdbId}`,
+      {
+        next: { revalidate: 900 },
+      },
+      `OMDb request timed out for ${imdbId}`
+    );
 
     if (!res.ok) {
       throw new Error(`OMDb request failed: ${res.status}`);
@@ -153,6 +201,25 @@ async function fetchOmdbRatings(imdbId?: string | null) {
 }
 
 export async function GET(request: NextRequest) {
+  const ip = getClientIp(request);
+  const limiter = rateLimit(`movies:cards:${ip}`, {
+    windowMs: MOVIE_CARDS_RATE_LIMIT_WINDOW_MS,
+    max: MOVIE_CARDS_RATE_LIMIT_MAX,
+    blockMs: 5 * 60 * 1000,
+  });
+
+  if (!limiter.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(limiter.retryAfterSec),
+        },
+      }
+    );
+  }
+
   const idsParam = request.nextUrl.searchParams.get("ids") || "";
   const ids = Array.from(
     new Set(

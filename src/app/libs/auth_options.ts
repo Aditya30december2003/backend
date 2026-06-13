@@ -1,7 +1,7 @@
 // lib/auth-options.ts
 import prisma from "@/app/libs/prismaDB";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import type { Adapter } from "next-auth/adapters";
+import type { Adapter, AdapterUser } from "next-auth/adapters";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import type { NextAuthOptions } from "next-auth";
@@ -102,19 +102,23 @@ function sanitizeJwtToken(token: JWT): JWT {
 const baseAdapter = PrismaAdapter(prisma);
 const adapter: Adapter = {
   ...baseAdapter,
-  async createUser(data) {
+  async createUser(data: Omit<AdapterUser, "id">) {
     const normalizedEmail =
       typeof data.email === "string" ? normalizeEmail(data.email) : "";
+    if (!normalizedEmail) {
+      throw new Error("OAuth user email is invalid.");
+    }
+
     const safeImage = toSessionUrl(data.image);
     const fallbackName =
       toClampedNullableString(data.name, SESSION_NAME_MAX_LENGTH) ??
-      (normalizedEmail ? normalizedEmail.split("@")[0] : null) ??
+      normalizedEmail.split("@")[0] ??
       "Movie fan";
 
     return prisma.user.create({
       data: {
         ...data,
-        email: normalizedEmail || data.email,
+        email: normalizedEmail,
         name: fallbackName,
         image: safeImage,
         avatarUrl: safeImage,

@@ -97,6 +97,9 @@ export default function AddToWatchlistControlRevamp({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const tmdbId = getMovieTmdbId(movie);
+  const movieTitle = getMovieTitle(movie);
+  const moviePoster = getMoviePoster(movie);
+  const movieReleaseDate = getMovieReleaseDate(movie);
   const latestTmdbIdRef = useRef(tmdbId);
   const latestDefaultInWatchlistRef = useRef(Boolean(defaultInWatchlist));
   const loadRequestIdRef = useRef(0);
@@ -300,13 +303,13 @@ export default function AddToWatchlistControlRevamp({
         const res = await fetch(`/api/watchlists/${watchlistId}/items`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              movieId: tmdbId,
-              title: getMovieTitle(movie),
-              posterUrl: getMoviePoster(movie),
-              releaseDate: getMovieReleaseDate(movie),
-            }),
-          });
+          body: JSON.stringify({
+            movieId: tmdbId,
+            title: movieTitle,
+            posterUrl: moviePoster,
+            releaseDate: movieReleaseDate,
+          }),
+        });
         const payload = await res.json().catch(() => null);
         if (!res.ok || !payload?.ok) {
           throw new Error(payload?.error?.message || "Failed to save movie");
@@ -345,9 +348,9 @@ export default function AddToWatchlistControlRevamp({
       defaultId = loaded?.defaultWatchlistId || null;
     }
     if (!defaultId) {
-        showToast("Could not find your default list", 1500);
-        return;
-      }
+      showToast("Could not find your default list", 1500);
+      return;
+    }
 
     const inDefault = data.movieMembership
       ? Boolean(data.movieMembership.inDefault)
@@ -382,9 +385,9 @@ export default function AddToWatchlistControlRevamp({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           movieId: tmdbId,
-          title: getMovieTitle(movie),
-          posterPath: getMoviePoster(movie),
-          releaseDate: getMovieReleaseDate(movie),
+          title: movieTitle,
+          posterPath: moviePoster,
+          releaseDate: movieReleaseDate,
         }),
       });
       const savePayload = await saveRes.json().catch(() => null);
@@ -405,6 +408,9 @@ export default function AddToWatchlistControlRevamp({
   const inDefault = data.movieMembership
     ? Boolean(data.movieMembership.inDefault)
     : fallbackInDefault;
+  const primaryButtonLabel = inDefault
+    ? "Manage your saved lists"
+    : "Save to watchlist and choose lists";
 
   const stopLinkNavigation = (e: ReactMouseEvent) => {
     e.preventDefault();
@@ -521,24 +527,8 @@ export default function AddToWatchlistControlRevamp({
                   : "border-gray-300 bg-white/90 text-gray-800 hover:bg-blue-600 hover:text-white"
               }`
         }
-        aria-label={
-          compact
-              ? inDefault
-                ? "Manage your saved lists"
-                : "Save to watchlist and choose lists"
-             : inDefault
-              ? "Manage your saved lists"
-              : "Save to watchlist and choose lists"
-        }
-        title={
-          compact
-             ? inDefault
-              ? "Manage your saved lists"
-              : "Save to watchlist and choose lists"
-            : inDefault
-              ? "Manage your saved lists"
-              : "Save to watchlist and choose lists"
-        }
+        aria-label={primaryButtonLabel}
+        title={primaryButtonLabel}
       >
         {inDefault ? <MdCheck size={compact ? 16 : 18} /> : compact ? <MdAdd size={16} /> : <MdBookmark size={18} />}
         {!compact && <span>{inDefault ? "Saved" : "Save"}</span>}
@@ -579,23 +569,23 @@ export default function AddToWatchlistControlRevamp({
 
             <div>
               <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">
-                  Lists
-                </p>
-                <div className="space-y-1.5">
-                  {collectionLists.map((list) => renderListRow(list))}
-                  {!loading && collectionLists.length === 0 ? (
-                    <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white/65">
-                      No custom lists yet.
-                    </div>
-                  ) : null}
-                </div>
+                Lists
+              </p>
+              <div className="space-y-1.5">
+                {collectionLists.map((list) => renderListRow(list))}
+                {!loading && collectionLists.length === 0 ? (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white/65">
+                    No custom lists yet.
+                  </div>
+                ) : null}
               </div>
+            </div>
 
             {!loading && !defaultList && visibleWatchlists.length === 0 ? (
               <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white/70">
-                  No lists found yet.
-                </div>
-              ) : null}
+                No lists found yet.
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-3 border-t border-white/10 pt-3">
