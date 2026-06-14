@@ -29,12 +29,12 @@ Status: Sprint 1 planning baseline locked during documentation QA
 5. Hardcoded TMDB keys still exist in source.
 6. Discovery, trending, and recommendations do too much request-time work.
 7. No tests.
-8. No verified GitHub-hosted CI run yet.
+8. No CI workflow is merged on `main` yet.
 9. Verified performance measurement is still incomplete.
 
 ## Completed Tickets
 
-- `T0001` Add GitHub CI for lint and production build
+- None yet under the new operating-system workflow.
 
 ## Known Risks
 
@@ -42,8 +42,8 @@ Status: Sprint 1 planning baseline locked during documentation QA
 - cache design can leak private data if user scoping is weak
 - architecture cleanup without tests can create regressions
 - database migration pressure may distract from higher-value short-term fixes
-- the first GitHub-hosted CI run may reveal additional environment assumptions
-- production build currently logs Prisma connection errors from some trending routes when MongoDB is unavailable during static generation
+- the first GitHub-hosted CI run may reveal additional environment assumptions once T0001 is merged
+- production build behavior under unavailable MongoDB still needs explicit baseline capture
 
 ## Active Epic
 
@@ -51,7 +51,7 @@ Status: Sprint 1 planning baseline locked during documentation QA
 
 ## Next Ticket
 
-- `T0002` Lock performance baseline to verified facts only
+- `T0001` Add GitHub CI for lint and production build
 
 ## Canonical Sprint 1 Docs
 

@@ -5,9 +5,9 @@ Last updated: 2026-06-13
 
 ## Verified current issues
 
-- a GitHub Actions CI workflow now exists, but its first hosted run still needs verification
+- no CI workflow is merged on `main` yet
 - no verified automated tests exist yet
-- production build currently logs Prisma connection errors from some trending routes when MongoDB is unavailable during static generation
+- production build behavior with unavailable MongoDB still needs baseline capture
 - watchlist ownership and API surface are duplicated across multiple route families
 - watchlist detail still returns too much data for large lists
 - browser-side TMDB and OMDb access still exists in page-critical flows
@@ -35,7 +35,7 @@ Not in Sprint 1:
 - real large-watchlist payload sizes
 - hot-route P95 and P99 timings
 - realistic benchmark data volume
-- first GitHub-hosted CI run after workflow creation
+- first GitHub-hosted CI run after T0001 is merged
 
 ## Followups after Sprint 1
 
