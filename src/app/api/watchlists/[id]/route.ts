@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { createRouteLogger } from "@/lib/api-debug";
 import {
   DEFAULT_WATCHLIST_SLUG,
   LEGACY_DEFAULT_WATCHLIST_SLUG,
@@ -110,11 +111,21 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const logger = createRouteLogger("GET /api/watchlists/[id]");
+  const handlerTimer = logger.start("handler_total");
+
   try {
+    const authTimer = logger.start("auth_lookup");
     const me = await getCurrentUserOrNull();
+    logger.end(authTimer);
+
+    const accessTimer = logger.start("access_lookup");
     let access = me ? await getAccessibleWatchlistForUser(params.id, me.id) : null;
+    logger.end(accessTimer);
 
     if (!access) {
+      logger.log("public watchlist lookup start", { watchlistId: params.id });
+      const publicTimer = logger.start("public_watchlist_lookup");
       const publicWatchlist = await prisma.watchlist.findUnique({
         where: { id: params.id },
         select: {
@@ -131,8 +142,10 @@ export async function GET(
         !publicWatchlist.isPublic ||
         isDefaultWatchlistRecord(publicWatchlist)
       ) {
+        logger.end(publicTimer);
         return err("NOT_FOUND", "Watchlist not found", 404);
       }
+      logger.end(publicTimer);
 
       access = {
         watchlist: publicWatchlist,
@@ -147,6 +160,12 @@ export async function GET(
       return err("NOT_FOUND", "Watchlist not found", 404);
     }
 
+    logger.log("watchlist query start", {
+      watchlistId: params.id,
+      role: resolvedAccess.role,
+      isOwner: resolvedAccess.isOwner,
+    });
+    const watchlistTimer = logger.start("watchlist_query");
     const full = await prisma.watchlist.findUnique({
       where: { id: params.id },
       include: {
@@ -198,11 +217,20 @@ export async function GET(
           : false,
       },
     });
+    logger.end(watchlistTimer);
 
     if (!full) return err("NOT_FOUND", "Watchlist not found", 404);
+    logger.log("watchlist query end", {
+      watchlistId: params.id,
+      itemCount: full._count?.items ?? full.items.length,
+      memberCount: full._count?.members ?? full.members.length,
+      includeInvites: roleCanManage(resolvedAccess.role),
+    });
 
     const summary = parseWatchlistSummary(full, me?.id);
+    const sortTimer = logger.start("sort_items");
     const sortedItems = sortWatchlistItemsByRank(full.items);
+    logger.end(sortTimer);
 
     return ok({
       watchlist: {
@@ -219,6 +247,8 @@ export async function GET(
   } catch (error) {
     console.error("GET /api/watchlists/[id] error", error);
     return err("INTERNAL_ERROR", "Failed to load watchlist", 500);
+  } finally {
+    logger.end(handlerTimer);
   }
 }
 

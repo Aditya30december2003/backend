@@ -61,6 +61,21 @@ Current lint/build warnings observed on 2026-06-14:
 - raw `<img>` warning in `src/app/components/WatchListClient/WatchListClientRevamp.jsx`
 - missing `alt` warning in `src/app/(pages)/theater/watch/page.tsx`
 
+## Verified local timing instrumentation
+
+Instrumented in `T0003` behind `DEBUG_API_TIMING=1`:
+
+- `GET /api/watchlists`
+- `GET /api/watchlists/[id]`
+- `GET /api/movies/discovery`
+- `GET /api/movies/recommendations/[movieId]`
+- `GET /api/trending_movies_week`
+
+Verified locally on 2026-06-14:
+
+- with `DEBUG_API_TIMING=1`, custom timing lines were emitted for `/api/watchlists` and `/api/trending_movies_week`
+- with `DEBUG_API_TIMING` unset, the same requests produced only normal Next.js request logs and no custom timing lines
+
 ## Needs measurement
 
 - watchlist summary endpoint latency
@@ -72,6 +87,7 @@ Current lint/build warnings observed on 2026-06-14:
 - cold-start behavior in deployment
 - slow Prisma query distribution
 - image payload sizes on poster-heavy pages
+- remaining instrumented routes under realistic auth and data conditions
 
 ## Next measurement tickets
 
@@ -84,6 +100,7 @@ Current lint/build warnings observed on 2026-06-14:
 ```powershell
 npm run lint
 npm run build
+(set DEBUG_API_TIMING=1) and hit the instrumented routes locally
 (Get-ChildItem src\app\api -Recurse -File | Measure-Object).Count
 (Get-ChildItem src\app -Recurse -Include page.tsx,page.ts,page.jsx,page.js -File | Measure-Object).Count
 (Get-ChildItem src -Recurse -Include *.js,*.jsx,*.ts,*.tsx -File | Measure-Object).Count

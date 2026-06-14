@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import prisma from "@/lib/prisma";
 import { getSeasonalQueryParams } from "@/app/helpers/Seasonal";
 import { getHybridRecommendationsForMovie } from "@/app/libs/movieRecommendations";
+import { createRouteLogger } from "@/lib/api-debug";
 import { fetchWithTimeout } from "@/lib/server-fetch";
 
 export const dynamic = "force-dynamic";
@@ -284,7 +285,11 @@ function computeOccasionTitle(
 }
 
 export async function GET(req: NextRequest) {
+  const logger = createRouteLogger("GET /api/movies/discovery");
+  const handlerTimer = logger.start("handler_total");
+
   try {
+    const contextTimer = logger.start("request_context");
     const { searchParams } = new URL(req.url);
     const weather = searchParams.get("weather");
     const tempParam = searchParams.get("tempC");
@@ -296,6 +301,7 @@ export async function GET(req: NextRequest) {
 
     const occasionQuery = seasonal.secondary || seasonal.primary || weatherMood.query;
     const occasionTitle = computeOccasionTitle(seasonal, weatherMood);
+    logger.end(contextTimer);
 
     const genreConfig = [
       { id: 28, name: "Action" },
@@ -314,9 +320,19 @@ export async function GET(req: NextRequest) {
     ];
     const actorNames = ["Shah Rukh Khan", "Salman Khan", "Deepika Padukone", "Leonardo DiCaprio"];
 
+    const sessionTimer = logger.start("session_lookup");
     const session = await getServerSession(authOptions);
+    logger.end(sessionTimer);
+    const seedTimer = logger.start("seed_movie_lookup");
     const seedMovie = await findSeedMovieForUser(session?.user?.email ?? null);
+    logger.end(seedTimer);
 
+    logger.log("external fan-out start", {
+      occasionQuery,
+      hasSeedMovie: Boolean(seedMovie),
+      weather: weather || null,
+    });
+    const fanoutTimer = logger.start("external_fanout");
     const [
       occasionItems,
       trendingData,
@@ -334,6 +350,7 @@ export async function GET(req: NextRequest) {
       Promise.all(directorNames.map((name) => discoverByPerson(name, "director"))),
       Promise.all(actorNames.map((name) => discoverByPerson(name, "actor"))),
     ]);
+    logger.end(fanoutTimer);
 
     const trending = (trendingData.results || []).map(normalizeMovie).slice(0, 20);
     const upcoming = (upcomingData.results || []).map(normalizeMovie).slice(0, 30);
@@ -362,14 +379,33 @@ export async function GET(req: NextRequest) {
       ? randomPool[Math.floor(Math.random() * randomPool.length)]
       : null;
 
-    const becauseYouWatched = seedMovie
-      ? await getHybridRecommendationsForMovie({
-          tmdbId: seedMovie.tmdbId,
-          dbMovieId: seedMovie.dbMovieId,
-          title: seedMovie.title,
-          limit: 16,
-        })
-      : null;
+    let becauseYouWatched = null;
+    if (seedMovie) {
+      logger.log("hybrid recommendations start", {
+        seedTmdbId: seedMovie.tmdbId,
+        seedTitle: seedMovie.title,
+      });
+      const recommendationsTimer = logger.start("hybrid_recommendations");
+      becauseYouWatched = await getHybridRecommendationsForMovie({
+        tmdbId: seedMovie.tmdbId,
+        dbMovieId: seedMovie.dbMovieId,
+        title: seedMovie.title,
+        limit: 16,
+      });
+      logger.end(recommendationsTimer);
+    }
+
+    const filteredDirectors = directors.filter((d) => d.items.length > 0);
+    const filteredActors = actors.filter((a) => a.items.length > 0);
+    logger.log("response summary", {
+      occasionCount: occasionItems.length,
+      trendingCount: trending.length,
+      upcomingCount: upcoming.length,
+      genreBucketCount: genreBuckets.length,
+      directorBucketCount: filteredDirectors.length,
+      actorBucketCount: filteredActors.length,
+      hasBecauseYouWatched: Boolean(becauseYouWatched),
+    });
 
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
@@ -388,8 +424,8 @@ export async function GET(req: NextRequest) {
       },
       categories: {
         genres: genreBuckets,
-        directors: directors.filter((d) => d.items.length > 0),
-        actors: actors.filter((a) => a.items.length > 0),
+        directors: filteredDirectors,
+        actors: filteredActors,
       },
       becauseYouWatched,
       releaseCalendar: {
@@ -408,5 +444,7 @@ export async function GET(req: NextRequest) {
       { error: "Failed to load movie discovery data" },
       { status: 500 }
     );
+  } finally {
+    logger.end(handlerTimer);
   }
 }

@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { createRouteLogger } from "@/lib/api-debug";
 import { fetchWithTimeout } from "@/lib/server-fetch";
 
 const calculateWeeklyTrendingScore = (likes7d, ratings7d, watchlist7d, reviews7d) =>
@@ -37,6 +38,9 @@ async function enrichTmdbMovie(tmdbId, apiKey) {
 }
 
 export const GET = async () => {
+  const logger = createRouteLogger("GET /api/trending_movies_week");
+  const handlerTimer = logger.start("handler_total");
+
   try {
     const apiKey = tmdbApiKey();
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -51,6 +55,8 @@ export const GET = async () => {
     // console.log("since:", since.toISOString());
     // console.log({ totalLikes, likesLast7d, totalRatings, ratingsLast7d });
 
+    logger.log("db query start", { since: since.toISOString() });
+    const dbTimer = logger.start("db_query");
     const movies = await prisma.movie.findMany({
       select: {
         id: true,
@@ -68,7 +74,10 @@ export const GET = async () => {
         reviews: { where: { createdAt: { gte: since } }, select: { id: true } },
       },
     });
+    logger.end(dbTimer);
+    logger.log("db query end", { movieCount: movies.length });
 
+    const scoringTimer = logger.start("score_movies");
     const weeklyTrending = movies
       .map((m) => {
         const likes7d = m.liked?.length ?? 0;
@@ -104,8 +113,11 @@ export const GET = async () => {
         };
       })
       .sort((a, b) => b.trendingScore - a.trendingScore);
+    logger.end(scoringTimer);
 
     const topTrending = weeklyTrending.slice(0, 20);
+    logger.log("tmdb enrichment start", { movieCount: topTrending.length });
+    const enrichmentTimer = logger.start("tmdb_enrichment");
     const enrichedMeta = await Promise.all(
       topTrending.map(async (movie) => {
         const tmdbMovie = await enrichTmdbMovie(movie.tmdbId, apiKey);
@@ -117,6 +129,7 @@ export const GET = async () => {
         };
       })
     );
+    logger.end(enrichmentTimer);
 
     return NextResponse.json(enrichedMeta, {
       status: 200,
@@ -130,5 +143,7 @@ export const GET = async () => {
       { message: "Error fetching weekly trending movies.", error: err?.message },
       { status: 500 }
     );
+  } finally {
+    logger.end(handlerTimer);
   }
 };

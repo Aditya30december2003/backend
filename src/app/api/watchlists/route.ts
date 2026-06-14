@@ -35,8 +35,8 @@ export async function GET(req: NextRequest) {
     const defaultWatchlist = await syncLegacyWatchlistToDefault(me.id);
     logger.end(syncTimer);
 
-    logger.log("db query start", { userId: me.id, movieId: req.nextUrl.searchParams.get("movieId") });
-    const dbTimer = logger.start("db_query");
+    logger.log("watchlists query start", { userId: me.id });
+    const watchlistsTimer = logger.start("watchlists_query");
     const watchlists = await prisma.watchlist.findMany({
       where: buildWatchlistWhereForUser(me.id),
       orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
@@ -70,9 +70,15 @@ export async function GET(req: NextRequest) {
         },
       },
     });
+    logger.end(watchlistsTimer);
     const visibleWatchlists = watchlists.filter(
       (w) => !(w.slug === "my-watchlist" && !w.isSystemDefault)
     );
+    logger.log("watchlists query end", {
+      userId: me.id,
+      watchlistCount: visibleWatchlists.length,
+      requestedMovieId: req.nextUrl.searchParams.get("movieId"),
+    });
 
     const movieIdQuery = req.nextUrl.searchParams.get("movieId")?.trim();
     let movieMembership:
@@ -85,6 +91,12 @@ export async function GET(req: NextRequest) {
       | undefined;
 
     if (movieIdQuery) {
+      logger.log("movie membership lookup start", {
+        userId: me.id,
+        requestedMovieId: movieIdQuery,
+        watchlistCount: visibleWatchlists.length,
+      });
+      const membershipTimer = logger.start("movie_membership_lookup");
       const movie = await prisma.movie.findUnique({
         where: { tmdbId: String(movieIdQuery) },
         select: { id: true, tmdbId: true },
@@ -117,9 +129,15 @@ export async function GET(req: NextRequest) {
           watchlistIds: [],
         };
       }
+      logger.end(membershipTimer);
+      logger.log("movie membership lookup end", {
+        userId: me.id,
+        requestedMovieId: movieIdQuery,
+        inAny: movieMembership?.inAny ?? false,
+        inDefault: movieMembership?.inDefault ?? false,
+        watchlistCount: movieMembership?.watchlistIds.length ?? 0,
+      });
     }
-    logger.end(dbTimer);
-    logger.log("db query end", { watchlistCount: visibleWatchlists.length, userId: me.id });
 
     return ok({
       watchlists: visibleWatchlists.map((w) => parseWatchlistSummary(w, me.id)),

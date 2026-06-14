@@ -14,6 +14,7 @@ Last updated: 2026-06-14
 - image optimization is still disabled
 - hardcoded TMDB keys still exist in source
 - verified performance measurement is incomplete
+- route timing instrumentation exists locally, but real auth-backed and production-like measurements are still incomplete
 
 ## Sprint 1 scope lock
 
@@ -37,6 +38,7 @@ Not in Sprint 1:
 - realistic benchmark data volume
 - first GitHub-hosted CI run after T0001 is merged
 - production impact of the build-time trending-route Prisma failures
+- remaining instrumented timing routes under realistic auth and data conditions
 
 ## Followups after Sprint 1
 
