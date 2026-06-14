@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: true
+      NEXT_TELEMETRY_DISABLED: 1
+      DATABASE_URL: mongodb://127.0.0.1:27017/themovieproject-ci
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ci-nextauth-secret
+      SECRET: ci-nextauth-secret
+      GOOGLE_CLIENT_ID: ci-google-client-id
+      GOOGLE_CLIENT_SECRET: ci-google-client-secret
+      MUX_TOKEN_ID: ci-mux-token-id
+      MUX_TOKEN_SECRET: ci-mux-token-secret
+      MUX_WEBHOOK_SECRET: ci-mux-webhook-secret
+      TMDB_API_KEY: ci-tmdb-api-key
+      MOVIEDB_API_KEY: ci-tmdb-api-key
+      NEXT_PUBLIC_API_KEY: ci-tmdb-api-key
+      OMDB_API_KEY: ci-omdb-api-key
+      NEXT_PUBLIC_OMDB_API_KEY: ci-omdb-api-key
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run production build
+        run: npm run build
