@@ -21,6 +21,7 @@ function normalizeRedirectPath(pathname) {
 function passwordInfo(pw) {
   const checks = {
     length: pw.length >= 8,
+    maxLength: pw.length <= 72,
     lower: /[a-z]/.test(pw),
     upper: /[A-Z]/.test(pw),
     number: /\d/.test(pw),
@@ -61,6 +62,8 @@ export default function SignupPage() {
   const [available, setAvailable] = useState(null);
   const [usernameCheckError, setUsernameCheckError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [serverError, setServerError] = useState("");
   const debounceRef = useRef(null);
 
   const redirectTarget = useMemo(
@@ -77,6 +80,19 @@ export default function SignupPage() {
   const email = user.email.trim().toLowerCase();
   const name = user.name.trim();
   const pw = passwordInfo(user.password);
+  const showPasswordFeedback = submitAttempted || user.password.length > 0;
+  const passwordRequirements = useMemo(
+    () => [
+      { key: "length", label: "Use at least 8 characters.", met: pw.checks.length },
+      { key: "maxLength", label: "Keep it at 72 characters or fewer.", met: pw.checks.maxLength },
+      { key: "lower", label: "Add at least one lowercase letter.", met: pw.checks.lower },
+      { key: "upper", label: "Add at least one uppercase letter.", met: pw.checks.upper },
+      { key: "number", label: "Add at least one number.", met: pw.checks.number },
+      { key: "symbol", label: "Add at least one symbol.", met: pw.checks.symbol },
+    ],
+    [pw.checks.length, pw.checks.lower, pw.checks.maxLength, pw.checks.number, pw.checks.symbol, pw.checks.upper]
+  );
+  const missingPasswordRequirements = passwordRequirements.filter((item) => !item.met);
 
   useEffect(() => {
     setAvailable(null);
@@ -136,12 +152,14 @@ export default function SignupPage() {
     if (!usernameValid) return "Username must be 3-20 chars using a-z, 0-9, _ or .";
     if (checking) return "Checking username availability...";
     if (available === false) return "That username is already taken.";
-    if (!pw.valid) return "Password must be 8+ chars with upper, lower, number, and symbol.";
+    if (!pw.valid) return "Fix the password requirements shown above.";
     return null;
   }, [available, checking, email, emailValid, name.length, pw.valid, submitting, username.length, usernameValid]);
 
   const userSignUp = async (e) => {
     e.preventDefault();
+    setSubmitAttempted(true);
+    setServerError("");
 
     if (!canSubmit) {
       toast.error("Please fix the highlighted fields.");
@@ -175,6 +193,7 @@ export default function SignupPage() {
     } catch (error) {
       const message =
         error?.response?.data?.error || "Unable to create account right now.";
+      setServerError(message);
       toast.error(message);
     } finally {
       setSubmitting(false);
@@ -182,6 +201,7 @@ export default function SignupPage() {
   };
 
   const googleSignup = () => {
+    setServerError("");
     setSubmitting(true);
     signIn("google", {
       callbackUrl: redirectTarget,
@@ -229,7 +249,10 @@ export default function SignupPage() {
                 id="email"
                 type="email"
                 value={user.email}
-                onChange={(e) => setUser((prev) => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => {
+                  setServerError("");
+                  setUser((prev) => ({ ...prev, email: e.target.value }));
+                }}
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/40 outline-none focus:border-white/30"
                 placeholder="you@example.com"
                 autoComplete="email"
@@ -251,7 +274,10 @@ export default function SignupPage() {
                 id="name"
                 type="text"
                 value={user.name}
-                onChange={(e) => setUser((prev) => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => {
+                  setServerError("");
+                  setUser((prev) => ({ ...prev, name: e.target.value }));
+                }}
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/40 outline-none focus:border-white/30"
                 placeholder="Aditya Jain"
                 autoComplete="name"
@@ -274,9 +300,10 @@ export default function SignupPage() {
                   id="username"
                   type="text"
                   value={user.username}
-                  onChange={(e) =>
-                    setUser((prev) => ({ ...prev, username: e.target.value.toLowerCase() }))
-                  }
+                  onChange={(e) => {
+                    setServerError("");
+                    setUser((prev) => ({ ...prev, username: e.target.value.toLowerCase() }));
+                  }}
                   className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/40 outline-none focus:border-white/30"
                   placeholder="aditya_movies"
                   autoComplete="username"
@@ -316,15 +343,22 @@ export default function SignupPage() {
                   Password
                 </label>
                 <span className="text-xs text-white/60">
-                  8+ chars, upper/lower/number/symbol
+                  8-72 chars, upper/lower/number/symbol
                 </span>
               </div>
               <input
                 id="password"
                 type="password"
                 value={user.password}
-                onChange={(e) => setUser((prev) => ({ ...prev, password: e.target.value }))}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/40 outline-none focus:border-white/30"
+                onChange={(e) => {
+                  setServerError("");
+                  setUser((prev) => ({ ...prev, password: e.target.value }));
+                }}
+                className={`w-full rounded-xl bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/40 outline-none ${
+                  showPasswordFeedback && !pw.valid
+                    ? "border border-red-300/70 focus:border-red-200"
+                    : "border border-white/10 focus:border-white/30"
+                }`}
                 placeholder="********"
                 autoComplete="new-password"
                 required
@@ -333,6 +367,29 @@ export default function SignupPage() {
                 <div className={`h-2 rounded-full transition-all ${strengthBar}`} />
               </div>
               <p className="mt-1 text-xs text-white/70">Strength: {pw.level}</p>
+              {showPasswordFeedback && !pw.valid ? (
+                <div
+                  className="mt-2 rounded-xl border border-red-300/30 bg-red-500/10 p-3"
+                  aria-live="polite"
+                >
+                  <p className="text-xs font-semibold text-red-200">
+                    Password still needs:
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-red-100">
+                    {missingPasswordRequirements.map((item) => (
+                      <li key={item.key} className="flex items-start gap-2">
+                        <span className="mt-0.5 text-red-300">•</span>
+                        <span>{item.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {showPasswordFeedback && pw.valid ? (
+                <p className="mt-2 text-xs font-medium text-emerald-300" aria-live="polite">
+                  Password meets all signup requirements.
+                </p>
+              ) : null}
             </div>
 
             <button
@@ -346,8 +403,17 @@ export default function SignupPage() {
             >
               {submitting ? "Creating..." : "Create account"}
             </button>
+            {serverError ? (
+              <p className="text-center text-xs text-red-200" aria-live="polite">
+                {serverError}
+              </p>
+            ) : null}
             {!canSubmit && submitDisabledReason ? (
-              <p className="text-center text-xs text-white/70">
+              <p
+                className={`text-center text-xs ${
+                  submitAttempted ? "text-red-200" : "text-white/70"
+                }`}
+              >
                 {submitDisabledReason}
               </p>
             ) : null}
