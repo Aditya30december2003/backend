@@ -1,13 +1,13 @@
 # Known Issues And Followups
 
 Status: Active triage register
-Last updated: 2026-06-13
+Last updated: 2026-06-14
 
 ## Verified current issues
 
 - no CI workflow is merged on `main` yet
 - no verified automated tests exist yet
-- production build behavior with unavailable MongoDB still needs baseline capture
+- production build succeeds locally without MongoDB, but logs Prisma `P2010` connection failures from trending routes during static generation
 - watchlist ownership and API surface are duplicated across multiple route families
 - watchlist detail still returns too much data for large lists
 - browser-side TMDB and OMDb access still exists in page-critical flows
@@ -36,6 +36,7 @@ Not in Sprint 1:
 - hot-route P95 and P99 timings
 - realistic benchmark data volume
 - first GitHub-hosted CI run after T0001 is merged
+- production impact of the build-time trending-route Prisma failures
 
 ## Followups after Sprint 1
 
